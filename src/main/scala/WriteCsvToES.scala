@@ -33,19 +33,8 @@ object WriteCsvToES {
     cars.collect().foreach(println)
 
     // Writing RDD to ElasticSearch
-    val writables = cars.map(prepareCars).map(mapToOutput)
+    val writables = cars.map(Car.toMap).map(mapToOutput)
     writables.saveAsHadoopDataset(jobConf)
-  }
-
-  def prepareCars(car: Car): Map[String, String] = {
-    val fields = Map(
-      "year" -> car.year.toString,
-      "make" -> car.make,
-      "model" -> car.model,
-      "desc" -> car.desc,
-      "price" -> car.price.toString
-    )
-    fields
   }
 
   def mapToOutput(in: Map[String, String]): (Object, Object) = {
