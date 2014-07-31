@@ -29,8 +29,11 @@ object WriteCsvToES {
 
     // Reading a CSV file
     val csvFile = sc.textFile(getClass.getResource("cars.csv").toString)
-    val cars = csvFile.map(_.split(";")).map(line => Car.fromCsv(line))
-    cars.collect().foreach(println)
+    val cars = csvFile.map(_.split(";")).map(Car.fromCsv)
+
+    val secondColumn = cars.map(car => car.price)
+    val sum = secondColumn.max
+    println(s"Sum of cars prices: $sum")
 
     // Writing RDD to ElasticSearch
     val writables = cars.map(Car.toMap).map(mapToOutput)
