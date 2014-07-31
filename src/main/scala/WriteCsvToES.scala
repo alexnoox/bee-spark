@@ -11,6 +11,8 @@ import org.elasticsearch.hadoop.cfg.ConfigurationOptions
 import org.elasticsearch.hadoop.mr.EsOutputFormat
 import types.Car
 
+import scala.collection.immutable.HashMap
+
 object WriteCsvToES {
   def main(args: Array[String]) {
     // Spark Context setup
@@ -31,7 +33,13 @@ object WriteCsvToES {
     val csvFile = sc.textFile(getClass.getResource("cars.csv").toString)
     val cars = csvFile.map(_.split(";")).map(Car.fromCsv)
 
-    val secondColumn = cars.map(car => car.price)
+    // Counting price sum per model
+    val carsPrice = cars.map(car => (car.model, car.price))
+    val modelSum = carsPrice.reduceByKey(_ + _)
+    modelSum.collect().foreach(println)
+
+    // Counting total price sum
+    val secondColumn = cars.map(_.price)
     val sum = secondColumn.max
     println(s"Sum of cars prices: $sum")
 
