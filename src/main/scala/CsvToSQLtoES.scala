@@ -11,6 +11,7 @@ import org.apache.spark.sql.SQLContext
 import org.elasticsearch.hadoop.cfg.ConfigurationOptions
 import org.elasticsearch.hadoop.mr.EsOutputFormat
 import types.Customer
+import types.Order
 
 object CsvToSQLtoES {
   def main(args: Array[String]) {
@@ -33,12 +34,24 @@ object CsvToSQLtoES {
     import sqlContext.createSchemaRDD
 
     // Creating customer table
-    val csvFile = sc.textFile(getClass.getResource("customers.csv").toString)
-    val customers = csvFile.map(_.split(";")).map(Customer.fromCsv)
+    val customersFile = sc.textFile(getClass.getResource("customers.csv").toString)
+    val customers = customersFile.map(_.split(";")).map(Customer.fromCsv)
     customers.registerAsTable("customers")
 
+    // Creating order table
+    val orderFile = sc.textFile(getClass.getResource("orders.csv").toString)
+    val orders = orderFile.map(_.split(";")).map(Order.fromCsv)
+    orders.registerAsTable("orders")
+
     // Request
-    val teenagers = sqlContext.sql("SELECT name FROM customers WHERE customerId >= 13 AND customerId <= 19")
-    teenagers.map(t => "Name: " + t(0)).collect().foreach(println)
+    val req = sqlContext.sql("""
+        SELECT c.name, SUM(o.amount)
+        FROM customers c JOIN orders o
+        ON c.customerId = o.customerId
+        GROUP BY c.name""")
+    req.persist();
+    
+    req.map(t => s"result: $t").collect().foreach(println)
+    println("Count: " + req.count())
   }
 }
