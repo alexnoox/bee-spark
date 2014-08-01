@@ -4,11 +4,13 @@ import org.apache.spark.SparkConf
 import org.apache.spark.serializer.KryoSerializer
 
 import org.apache.hadoop.fs.Path
-import org.apache.hadoop.io.{MapWritable, NullWritable, Text}
 import org.apache.hadoop.mapred.{FileOutputFormat, FileOutputCommitter, JobConf}
 
 import org.elasticsearch.hadoop.cfg.ConfigurationOptions
 import org.elasticsearch.hadoop.mr.EsOutputFormat
+
+import helpers.HadoopHelper
+
 
 object WriteToES {
   def main(args: Array[String]) {
@@ -29,14 +31,8 @@ object WriteToES {
     // Writing RDD to ElasticSearch
     val tweet = Map("user" -> "kimchy", "post_date" -> "2009-11-15T14:12:12", "message" -> "trying out Elastic Search")
     val tweets = sc.makeRDD(Seq(tweet))
-    val writables = tweets.map(toWritable)
+    val writables = tweets.map(HadoopHelper.mapToWritable)
     writables.saveAsHadoopDataset(jobConf)
   }
 
-  def toWritable(in: Map[String, String]): (Object, Object) = {
-    val m = new MapWritable
-    for ((k, v) <- in)
-      m.put(new Text(k), new Text(v))
-    (NullWritable.get, m)
-  }
 }

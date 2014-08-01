@@ -4,14 +4,14 @@ import org.apache.spark.SparkConf
 import org.apache.spark.serializer.KryoSerializer
 
 import org.apache.hadoop.fs.Path
-import org.apache.hadoop.io.{MapWritable, NullWritable, Text}
 import org.apache.hadoop.mapred.{FileOutputFormat, FileOutputCommitter, JobConf}
 
 import org.elasticsearch.hadoop.cfg.ConfigurationOptions
 import org.elasticsearch.hadoop.mr.EsOutputFormat
-import types.Car
 
-import scala.collection.immutable.HashMap
+import types.Car
+import helpers.HadoopHelper
+
 
 object WriteCsvToES {
   def main(args: Array[String]) {
@@ -44,14 +44,8 @@ object WriteCsvToES {
     println(s"Sum of cars prices: $sum")
 
     // Writing RDD to ElasticSearch
-    val writables = cars.map(Car.toMap).map(mapToOutput)
+    val writables = cars.map(Car.toMap).map(HadoopHelper.mapToWritable)
     writables.saveAsHadoopDataset(jobConf)
   }
 
-  def mapToOutput(in: Map[String, String]): (Object, Object) = {
-    val m = new MapWritable
-    for ((k, v) <- in)
-      m.put(new Text(k), new Text(v))
-    (NullWritable.get, m)
-  }
 }

@@ -4,14 +4,18 @@ import org.apache.spark.SparkConf
 import org.apache.spark.serializer.KryoSerializer
 
 import org.apache.hadoop.fs.Path
-import org.apache.hadoop.io.{MapWritable, NullWritable, Text}
 import org.apache.hadoop.mapred.{FileOutputFormat, FileOutputCommitter, JobConf}
 import org.apache.spark.sql.SQLContext
 
 import org.elasticsearch.hadoop.cfg.ConfigurationOptions
 import org.elasticsearch.hadoop.mr.EsOutputFormat
+
 import types.Customer
 import types.Order
+import helpers.HadoopHelper
+
+import scala.collection.immutable.HashMap
+
 
 object CsvToSQLtoES {
   def main(args: Array[String]) {
@@ -26,7 +30,7 @@ object CsvToSQLtoES {
     jobConf.setOutputCommitter(classOf[FileOutputCommitter])
     jobConf.set(ConfigurationOptions.ES_NODES, "vps67962.ovh.net")
     jobConf.set(ConfigurationOptions.ES_PORT, "9200")
-    jobConf.set(ConfigurationOptions.ES_RESOURCE, "cars/car") // index/type
+    jobConf.set(ConfigurationOptions.ES_RESOURCE, "orders/amount") // index/type
     FileOutputFormat.setOutputPath(jobConf, new Path("-"))
 
     val sqlContext = new SQLContext(sc)
@@ -49,9 +53,16 @@ object CsvToSQLtoES {
         FROM customers c JOIN orders o
         ON c.customerId = o.customerId
         GROUP BY c.name""")
-    req.persist();
-    
-    req.map(t => s"result: $t").collect().foreach(println)
-    println("Count: " + req.count())
+
+    val writables = req.map(rowToMap).map(HadoopHelper.mapToWritable)
+    writables.saveAsHadoopDataset(jobConf)
+  }
+
+  def rowToMap(row: sql.Row) = {
+    val fields = HashMap(
+      "name" -> row.getString(0),
+      "amount" -> row.getLong(1).toString()
+    )
+    fields
   }
 }
