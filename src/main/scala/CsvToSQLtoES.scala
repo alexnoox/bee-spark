@@ -28,7 +28,7 @@ object CsvToSQLtoES {
     val jobConf = new JobConf(sc.hadoopConfiguration)
     jobConf.setOutputFormat(classOf[EsOutputFormat])
     jobConf.setOutputCommitter(classOf[FileOutputCommitter])
-    jobConf.set(ConfigurationOptions.ES_NODES, "vps67962.ovh.net")
+    jobConf.set(ConfigurationOptions.ES_NODES, "localhost")
     jobConf.set(ConfigurationOptions.ES_PORT, "9200")
     jobConf.set(ConfigurationOptions.ES_RESOURCE, "orders/amount") // index/type
     FileOutputFormat.setOutputPath(jobConf, new Path("-"))
@@ -54,6 +54,13 @@ object CsvToSQLtoES {
         ON c.customerId = o.customerId
         GROUP BY c.name""")
 
+    req.persist()
+
+    // To the console
+    req.map(t => s"result: $t").collect().foreach(println)
+    println("Count: " + req.count())
+
+    // To ElasticSearch
     val writables = req.map(rowToMap).map(HadoopHelper.mapToWritable)
     writables.saveAsHadoopDataset(jobConf)
   }
