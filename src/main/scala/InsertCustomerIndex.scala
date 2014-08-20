@@ -17,7 +17,7 @@ import helpers.HadoopHelper
 import scala.collection.immutable.HashMap
 
 
-object CsvToSQLtoES {
+object InsertCustomerIndex {
   def main(args: Array[String]) {
     // Spark Context setup
     val conf = new SparkConf().setMaster("local").setAppName("Bee-Spark")
@@ -30,7 +30,7 @@ object CsvToSQLtoES {
     jobConf.setOutputCommitter(classOf[FileOutputCommitter])
     jobConf.set(ConfigurationOptions.ES_NODES, "localhost")
     jobConf.set(ConfigurationOptions.ES_PORT, "9200")
-    jobConf.set(ConfigurationOptions.ES_RESOURCE, "orders/amount") // index/type
+    jobConf.set(ConfigurationOptions.ES_RESOURCE, "customer/amount") // index/type
     FileOutputFormat.setOutputPath(jobConf, new Path("-"))
 
     val sqlContext = new SQLContext(sc)
@@ -38,12 +38,12 @@ object CsvToSQLtoES {
     import sqlContext.createSchemaRDD
 
     // Creating customer table
-    val customersFile = sc.textFile(getClass.getResource("customers.csv").toString)
+    val customersFile = sc.textFile(getClass.getResource("fake-customer-qn.csv").toString)
     val customers = customersFile.map(_.split(";")).map(Customer.fromCsv)
     customers.registerAsTable("customers")
 
     // Creating order table
-    val orderFile = sc.textFile(getClass.getResource("orders.csv").toString)
+    val orderFile = sc.textFile(getClass.getResource("fake-order-qn.csv").toString)
     val orders = orderFile.map(_.split(";")).map(Order.fromCsv)
     orders.registerAsTable("orders")
 
