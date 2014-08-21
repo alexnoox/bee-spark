@@ -2,4 +2,5 @@
 -/
 project/
 target/
-.csv
+fake*.csv
+fake*.json

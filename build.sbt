@@ -3,8 +3,8 @@ name := "bee-idea"
 version := "1.0"
 
 libraryDependencies ++= Seq(
-  "org.apache.spark" %% "spark-core" % "1.0.1",
-  "org.apache.spark" %% "spark-sql" % "1.0.1",
+  "org.apache.spark" %% "spark-core" % "1.0.2",
+  "org.apache.spark" %% "spark-sql" % "1.0.2",
   "org.elasticsearch" % "elasticsearch-hadoop" % "2.0.0"
 )
 
