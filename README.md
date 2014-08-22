@@ -5,3 +5,6 @@ Project to map input data files, reduce to a given format and export to elastics
 Package this project using `$ sbt package`
 
 Launch with `YOUR_SPARK_HOME/bin/spark-submit --class Main target/scala-2.10/bee-spark-project_2.10-1.0.jar`
+
+increase the max file limit
+add 'limit maxfiles 16384 32768` /etc/launchd.conf and then reboot
