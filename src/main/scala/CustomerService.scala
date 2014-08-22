@@ -33,8 +33,8 @@ object CustomerService {
 
     val sqlContext = new SQLContext(sc)
 
-    val customerPath = "/Users/alex/ab-repo/Faker.js/fake-customer-fta.json"
-    val orderPath = "/Users/alex/ab-repo/Faker.js/fake-order-fta.json"
+    val customerPath = "/Users/alex/ab-repo/Faker.js/fake-customer-qn.json"
+    val orderPath = "/Users/alex/ab-repo/Faker.js/fake-order-qn.json"
 
     // Create a SchemaRDD from the file(s) pointed to by path
     val customer = sqlContext.jsonFile(customerPath)
