@@ -5,10 +5,13 @@ import org.apache.spark._
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.SQLContext
 import org.bson.BasicBSONObject
+
 import org.elasticsearch.hadoop.cfg.ConfigurationOptions
 import org.elasticsearch.hadoop.mr.EsOutputFormat
 
 import scala.collection.immutable.HashMap
+
+import helpers.HadoopHelper
 
 object CustomerService {
   def main(args: Array[String]) {
@@ -27,67 +30,89 @@ object CustomerService {
     FileOutputFormat.setOutputPath(esConf, new Path("-"))
 
     // Mongo setup
-    val mongoConf = new JobConf(sc.hadoopConfiguration)
-    mongoConf.set("mongo.output.uri", "mongodb://127.0.0.1:27017/abo.output")
+    //val mongoConf = new JobConf(sc.hadoopConfiguration)
+    //mongoConf.set("mongo.output.uri", "mongodb://127.0.0.1:27017/abo.output")
+    val mongoOrderConf = new JobConf(sc.hadoopConfiguration)
+    mongoOrderConf.set("mongo.output.uri", "mongodb://127.0.0.1:27017/abo.order")
 
-
+    // SparkSQL context
     val sqlContext = new SQLContext(sc)
 
+    // Input file
     val customerPath = "/Users/alex/ab-repo/Faker.js/fake-customer-qn.json"
     val orderPath = "/Users/alex/ab-repo/Faker.js/fake-order-qn.json"
+    val orderLinePath = "/Users/alex/ab-repo/Faker.js/fake-orderLine-qn.json"
 
     // Create a SchemaRDD from the file(s) pointed to by path
     val customer = sqlContext.jsonFile(customerPath)
     val order = sqlContext.jsonFile(orderPath)
+    val orderLine = sqlContext.jsonFile(orderLinePath)
+
+    // Check the automatic schema
     customer.printSchema()
     order.printSchema()
+    orderLine.printSchema()
 
     // Register this SchemaRDD as a table.
     customer.registerAsTable("customers")
     order.registerAsTable("orders")
+    orderLine.registerAsTable("orderLines")
 
     // SQL statements can be run by using the sql methods provided by sqlContext.
-    val customerView = sqlContext.sql("""
-      SELECT c.id, c.name, c.siren, c.catchPhrase, COUNT(*)
-      FROM customers c JOIN orders o
+    val orderDocument = sqlContext.sql("""
+      SELECT c.id, c.name, c.siren, c.catchPhrase, o.description, COUNT(*)
+      FROM customers c RIGHT JOIN orders o
       ON c.id = o.customerId
-      GROUP BY c.id, c.name, c.siren, c.catchPhrase""")
-
-    customerView.registerAsTable("customerViews")
-    println("Result of SELECT * customerViews table :")
-
-    sqlContext.sql("SELECT * FROM customerViews").collect().foreach(println)
-
-    customerView.persist()
+      GROUP BY c.id, c.name, c.siren, c.catchPhrase, o.description""")
 
 
-    customer.map(t => s"result: $t").collect().foreach(println)
+    orderDocument.persist()
+    orderLine.persist()
 
-    println("Count: " + customerView.count())
+    //println("Count: " + orderDocument.count())
+    orderDocument.registerAsTable("orderDocuments")
+    //sqlContext.sql("SELECT * FROM orderDocuments o ORDER BY o.name").collect().foreach(println)
+
+    sqlContext.sql("SELECT * FROM orderDocuments o ORDER BY o.name").collect().foreach((row : sql.Row) => {
+      println("Each : " + row.getString(1))
+
+      println("customer name : " + row.getString(1))
+      println("customer siren : " + row.getString(2))
+
+      if (row.getString(1).startsWith("M")) {
+        println("M...")
+        println((row.getString(1)))
+      }
+    })
 
     // To ElasticSearch
-    //val writablesES = customerView.map(rowToMapES).map(HadoopHelper.mapToWritable)
+    //val writablesES = orderDocument.map(rowToMapES).map(HadoopHelper.mapToWritable)
     //writablesES.saveAsHadoopDataset(esConf)
 
-    val saveRDD = customerView.map((row: sql.Row) => {
+    // To Mongodb
+    val orderRDD = orderDocument.map((row: sql.Row) => {
       var bson = new BasicBSONObject()
-      bson.put("nom", row.getString(1))
-      bson.put("siren", row.getString(2))
-      bson.put("slogan", row.getString(3))
+
+      bson.put("customerId", row.getInt(0))
+      bson.put("customerName", row.getString(1))
+      bson.put("customerSiren", row.getString(2))
+      bson.put("orderDescription", row.getString(4))
+      bson.put("test", "alex")
       (null, bson)
     })
-    saveRDD.saveAsNewAPIHadoopFile("file:///bogus", classOf[Any], classOf[Any], classOf[com.mongodb.hadoop.MongoOutputFormat[Any, Any]], mongoConf)
+    orderRDD.saveAsNewAPIHadoopFile("file:///bogus", classOf[Any], classOf[Any], classOf[com.mongodb.hadoop.MongoOutputFormat[Any, Any]], mongoOrderConf)
+
   }
 
-  def rowToMapES(row: sql.Row) = {
-    val fields = HashMap(
-      "id" -> row.getInt(0).toString(),
-      "nom" -> row.getString(1),
-      "siren" -> row.getString(2),
-      "slogan" -> row.getString(3),
-      "totalOrder" -> row.getLong(4).toString()
-    )
-    fields
-  }
+//  def rowToMapES(row: sql.Row) = {
+//    val fields = HashMap(
+//      "id" -> row.getInt(0).toString(),
+//      "nom" -> row.getString(1),
+//      "siren" -> row.getString(2),
+//      "slogan" -> row.getString(3),
+//      "totalOrder" -> row.getLong(4).toString()
+//    )
+//    fields
+//  }
 
 }
