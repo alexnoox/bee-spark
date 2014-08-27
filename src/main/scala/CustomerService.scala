@@ -63,7 +63,8 @@ object CustomerService {
       SELECT c.id, c.name, c.siren, c.catchPhrase, o.description, COUNT(*)
       FROM customers c RIGHT JOIN orders o
       ON c.id = o.customerId
-      GROUP BY c.id, c.name, c.siren, c.catchPhrase, o.description""")
+      GROUP BY c.id, c.name, c.siren, c.catchPhrase, o.description
+      ORDER BY c.name""")
 
 
     orderDocument.persist()
@@ -73,24 +74,36 @@ object CustomerService {
     orderDocument.registerAsTable("orderDocuments")
     //sqlContext.sql("SELECT * FROM orderDocuments o ORDER BY o.name").collect().foreach(println)
 
-    sqlContext.sql("SELECT * FROM orderDocuments o ORDER BY o.name").collect().foreach((row : sql.Row) => {
-      println("Each : " + row.getString(1))
+    var itemOLD = ""
+    var bson = new BasicBSONObject()
 
-      println("customer name : " + row.getString(1))
-      println("customer siren : " + row.getString(2))
+    sqlContext.sql("SELECT * FROM orderDocuments o ORDER BY o.name").collect().foreach((row: sql.Row) => {
+      var itemNew = row.getString(1)
+      if (itemNew == itemOLD) {
+        println("order : " + row.getString(4))
+        bson.put("order",new BasicBSONObject("orderDescription",row.getString(4)))
+        bson.put("order",new BasicBSONObject("orderDescription","toto"))
 
-      if (row.getString(1).startsWith("M")) {
-        println("M...")
-        println((row.getString(1)))
       }
+      else if (itemNew != itemOLD) {
+        //var bson = new BasicBSONObject()
+        println("customer name : " + row.getString(1))
+        bson.put("customerName", row.getString(1))
+        println("customer siren : " + row.getString(2))
+        bson.put("customerSiren", row.getString(2))
+      }
+      itemOLD = row.getString(1)
+      println("bson : " + bson.toString)
+
     })
+
 
     // To ElasticSearch
     //val writablesES = orderDocument.map(rowToMapES).map(HadoopHelper.mapToWritable)
     //writablesES.saveAsHadoopDataset(esConf)
 
     // To Mongodb
-    val orderRDD = orderDocument.map((row: sql.Row) => {
+/*    val orderRDD = orderDocument.map((row: sql.Row) => {
       var bson = new BasicBSONObject()
 
       bson.put("customerId", row.getInt(0))
@@ -99,8 +112,8 @@ object CustomerService {
       bson.put("orderDescription", row.getString(4))
       bson.put("test", "alex")
       (null, bson)
-    })
-    orderRDD.saveAsNewAPIHadoopFile("file:///bogus", classOf[Any], classOf[Any], classOf[com.mongodb.hadoop.MongoOutputFormat[Any, Any]], mongoOrderConf)
+    }) */
+    //orderRDD.saveAsNewAPIHadoopFile("file:///bogus", classOf[Any], classOf[Any], classOf[com.mongodb.hadoop.MongoOutputFormat[Any, Any]], mongoOrderConf)
 
   }
 
