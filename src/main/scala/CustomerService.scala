@@ -5,6 +5,7 @@ import org.apache.spark._
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.SQLContext
 import org.bson.BasicBSONObject
+import org.bson.types.BasicBSONList
 
 import org.elasticsearch.hadoop.cfg.ConfigurationOptions
 import org.elasticsearch.hadoop.mr.EsOutputFormat
@@ -76,26 +77,25 @@ object CustomerService {
 
     var itemOLD = ""
     var bson = new BasicBSONObject()
+    var bsonOrderList = new BasicBSONList()
 
     sqlContext.sql("SELECT * FROM orderDocuments o ORDER BY o.name").collect().foreach((row: sql.Row) => {
       var itemNew = row.getString(1)
       if (itemNew == itemOLD) {
-        println("order : " + row.getString(4))
-        bson.put("order",new BasicBSONObject("orderDescription",row.getString(4)))
-        bson.put("order",new BasicBSONObject("orderDescription","toto"))
-
+        bsonOrderList.add(new BasicBSONObject("orderDescription", row.getString(4)))
+        bson.put("orderList",bsonOrderList)
       }
       else if (itemNew != itemOLD) {
         //var bson = new BasicBSONObject()
-        println("customer name : " + row.getString(1))
         bson.put("customerName", row.getString(1))
-        println("customer siren : " + row.getString(2))
         bson.put("customerSiren", row.getString(2))
       }
       itemOLD = row.getString(1)
       println("bson : " + bson.toString)
 
     })
+
+    
 
 
     // To ElasticSearch
