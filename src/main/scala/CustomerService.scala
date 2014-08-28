@@ -119,8 +119,6 @@ object CustomerService {
     println("return bson : " + bsonOld.toString)
 
 
-
-
     // To ElasticSearch
     //val writablesES = orderDocument.map(rowToMapES).map(HadoopHelper.mapToWritable)
     //writablesES.saveAsHadoopDataset(esConf)
