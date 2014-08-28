@@ -71,31 +71,54 @@ object CustomerService {
     orderDocument.persist()
     orderLine.persist()
 
-    //println("Count: " + orderDocument.count())
     orderDocument.registerAsTable("orderDocuments")
     //sqlContext.sql("SELECT * FROM orderDocuments o ORDER BY o.name").collect().foreach(println)
 
-    var itemOLD = ""
-    var bson = new BasicBSONObject()
-    var bsonOrderList = new BasicBSONList()
+    var itemOld = ""
+
+    var bsonCurrent = new BasicBSONObject()
+    var bsonOld = new BasicBSONObject()
+
+    var bsonOrderListCurrent = new BasicBSONList()
+    var bsonOrderListOld = new BasicBSONList()
 
     sqlContext.sql("SELECT * FROM orderDocuments o ORDER BY o.name").collect().foreach((row: sql.Row) => {
-      var itemNew = row.getString(1)
-      if (itemNew == itemOLD) {
-        bsonOrderList.add(new BasicBSONObject("orderDescription", row.getString(4)))
-        bson.put("orderList",bsonOrderList)
+
+      var itemCurrent = row.getString(1)
+
+      // Je suis sur le premier customer
+      if (itemOld.isEmpty){
+        bsonCurrent.put("customerName", row.getString(1))
+        bsonCurrent.put("customerSiren", row.getString(2))
+        bsonOrderListCurrent = new BasicBSONList()
+        bsonOrderListCurrent.add(new BasicBSONObject("desc", row.getString(4)))
       }
-      else if (itemNew != itemOLD) {
-        //var bson = new BasicBSONObject()
-        bson.put("customerName", row.getString(1))
-        bson.put("customerSiren", row.getString(2))
+
+      // Je change de customer
+      if (itemCurrent != itemOld && !itemOld.isEmpty ) {
+        bsonOld.put("orderList", bsonOrderListOld)
+        println("return bson : " + bsonOld.toString)
+
+        bsonCurrent.put("customerName", row.getString(1))
+        bsonCurrent.put("customerSiren", row.getString(2))
+        bsonOrderListCurrent = new BasicBSONList()
       }
-      itemOLD = row.getString(1)
-      println("bson : " + bson.toString)
+
+      // Je suis sur le meme customer : Je rajoute l'order dans la liste
+      if (itemCurrent == itemOld) {
+        bsonOrderListCurrent.add(new BasicBSONObject("desc", row.getString(4)))
+      }
+
+      itemOld = row.getString(1)
+      bsonOld = bsonCurrent
+      bsonOrderListOld = bsonOrderListCurrent
 
     })
 
-    
+    bsonOld.put("orderList", bsonOrderListOld)
+    println("return bson : " + bsonOld.toString)
+
+
 
 
     // To ElasticSearch
