@@ -72,7 +72,6 @@ object CustomerService {
     orderLine.persist()
 
     orderDocument.registerAsTable("orderDocuments")
-    //sqlContext.sql("SELECT * FROM orderDocuments o ORDER BY o.name").collect().foreach(println)
 
     var itemOld = ""
 
@@ -82,6 +81,12 @@ object CustomerService {
     var bsonOrderListCurrent = new BasicBSONList()
     var bsonOrderListOld = new BasicBSONList()
 
+
+    // ##########################
+    // ALGO MAKE MONGO NESTED DOC
+    // ##########################
+    // This algo create nested document with customer and array of orders based on JOIN SQL TABLE.
+    // But this cannot work with spark RDD like wrtitten in "To MongoDB" comment
     sqlContext.sql("SELECT * FROM orderDocuments o ORDER BY o.name").collect().foreach((row: sql.Row) => {
 
       var itemCurrent = row.getString(1)
@@ -115,38 +120,52 @@ object CustomerService {
 
     })
 
+    // Je suis le dernier customer
     bsonOld.put("orderList", bsonOrderListOld)
     println("return bson : " + bsonOld.toString)
 
+    // ##########################
+    //   END ALGO NESTED DOC
+    // ##########################
 
+
+
+    // #################
     // To ElasticSearch
-    //val writablesES = orderDocument.map(rowToMapES).map(HadoopHelper.mapToWritable)
-    //writablesES.saveAsHadoopDataset(esConf)
+    // #################
+    // ...This work fine. Commented only to reduce time excution
+    /*
+      val writablesES = orderDocument.map(rowToMapES).map(HadoopHelper.mapToWritable)
+      writablesES.saveAsHadoopDataset(esConf)
+    */
 
+    // ############
     // To Mongodb
-/*    val orderRDD = orderDocument.map((row: sql.Row) => {
+    // ###########
+    // ...This work fine. But only flat document (not nested!)
+    /*
+      val orderRDD = orderDocument.map((row: sql.Row) => {
       var bson = new BasicBSONObject()
-
       bson.put("customerId", row.getInt(0))
       bson.put("customerName", row.getString(1))
       bson.put("customerSiren", row.getString(2))
       bson.put("orderDescription", row.getString(4))
       bson.put("test", "alex")
       (null, bson)
-    }) */
-    //orderRDD.saveAsNewAPIHadoopFile("file:///bogus", classOf[Any], classOf[Any], classOf[com.mongodb.hadoop.MongoOutputFormat[Any, Any]], mongoOrderConf)
-
+    })
+    orderRDD.saveAsNewAPIHadoopFile("file:///bogus", classOf[Any], classOf[Any], classOf[com.mongodb.hadoop.MongoOutputFormat[Any, Any]], mongoOrderConf)
+    */
   }
 
-//  def rowToMapES(row: sql.Row) = {
-//    val fields = HashMap(
-//      "id" -> row.getInt(0).toString(),
-//      "nom" -> row.getString(1),
-//      "siren" -> row.getString(2),
-//      "slogan" -> row.getString(3),
-//      "totalOrder" -> row.getLong(4).toString()
-//    )
-//    fields
-//  }
+  def rowToMapES(row: sql.Row) = {
+    val fields = HashMap(
+      "id" -> row.getInt(0).toString(),
+      "nom" -> row.getString(1),
+      "siren" -> row.getString(2),
+      "slogan" -> row.getString(3),
+      "totalOrder" -> row.getLong(4).toString()
+    )
+    fields
+  }
 
 }
