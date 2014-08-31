@@ -5,7 +5,7 @@ import org.apache.spark.serializer.KryoSerializer
 import org.elasticsearch.hadoop.cfg.ConfigurationOptions
 import org.elasticsearch.hadoop.mr.EsInputFormat
 
-object ReadFromES {
+object SAMPLE_ReadFromES {
   def main(args: Array[String]) {
     val conf = new SparkConf().setMaster("local").setAppName("Bee-Spark")
     val sc = new SparkContext(conf)
