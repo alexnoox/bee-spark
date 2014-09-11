@@ -1,7 +1,6 @@
 import org.apache.hadoop.mapred.{FileOutputCommitter, FileOutputFormat, JobConf}
 import org.apache.spark.SparkContext._
 import org.apache.spark._
-import org.apache.spark.rdd.HadoopRDD
 import org.bson.BasicBSONObject
 import org.bson.types.BasicBSONList
 
@@ -21,31 +20,43 @@ object SAMPLE_NestedMap {
     case class Order (orderId: Int, customerId: Int, orderName: String, orderLine: OrderLine)
     case class OrderLine (orderLineId: Int, orderId: Int, lineAmount: Int )
 
+    println("############### r #########################")
+
     val tuple = Seq[(Customer)](
-      new Customer(1, "alex", new Order(1,1,"a_", new OrderLine(1,1,91)) ),
-      new Customer(1, "alex", new Order(2,1,"aa", new OrderLine(2,2,92)) ),
-      new Customer(1, "alex", new Order(2,1,"aa", new OrderLine(3,2,93)) ),
-      new Customer(2, "fred", new Order(3,2,"f_", new OrderLine(4,3,94)) ),
-      new Customer(2, "fred", new Order(4,2,"ff", new OrderLine(5,4,95)) ),
-      new Customer(2, "fred", new Order(4,2,"ff", new OrderLine(6,4,96)) )
+    new Customer(1, "alex", new Order(1,1,"a_", new OrderLine(1,1,91)) ),
+    new Customer(1, "alex", new Order(2,1,"aa", new OrderLine(2,2,92)) ),
+    new Customer(1, "alex", new Order(2,1,"aa", new OrderLine(3,2,93)) ),
+    new Customer(2, "fred", new Order(3,2,"f_", new OrderLine(4,3,94)) ),
+    new Customer(2, "fred", new Order(4,2,"ff", new OrderLine(5,4,95)) ),
+    new Customer(2, "fred", new Order(4,2,"ff", new OrderLine(6,4,96)) )
     )
 
+    println("----")
+    //val r1 = tuple.groupBy(_.customerId)
+    tuple.foreach(println)
 
-    val r1 = tuple.groupBy(_.customerId).mapValues(_.groupBy(_.order.orderId))
+    println("----")
+    val r2 = sc.parallelize(tuple).map(x => (x.customerId, (x.customerId, x.name, x.order.orderLine.lineAmount)))
+    r2.foreach(println)
+
+    println("----")
+    val r3 = r2.reduceByKey((a, b) => (b._1, b._2, (b._3 + b._3)))
+    r3.foreach(println)
+
+    println("############### s #########################")
+
+    val tuple1 = Seq[Int](1,2,3,4,2,3)
 
 
-    println("############### RDD1 #########################")
-    //val customerRDD1 = customer.join(orderC).join(orderLine)
-    //customerRDD1.foreach(println)
+    println("----")
+    val s1 = sc.parallelize(tuple1).map(x => (x, 1))
+    s1.foreach(println)
 
-    println("############### RDD2 #########################")
-    //val customerRDD2 = customerRDD1.groupBy(_._1).mapValues(_.groupBy(_._2))
-    //customerRDD2.foreach(println)
+    println("----")
+    val s2 = s1.reduceByKey((a, b) => a + b)
+    s2.foreach(println)
 
-    println("############### RDD3 #########################")
-    //val customerRDD3 = customerRDD2.groupBy(x => x)
-    //customerRDD3.foreach(println)
-
+    println("############### r3 #########################")
 
 
 
