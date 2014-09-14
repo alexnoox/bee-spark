@@ -18,7 +18,7 @@ object SAMPLE_NestedRDD {
 
     case class Customer (customerId: Int, name: String)
     case class Order (orderId: Int, customerId: Int, orderName: String)
-    case class OrderLine (orderLineId: Int, orderId: Int, orderName: String, lineAmount: Int )
+    case class OrderLine (orderLineId: Int, orderId: Int, lineAmount: Int )
 
     val customer = sc.textFile(getClass.getResource("fake-customer-qn.csv").toString).map(_.split(";")).map(
       c => (c(0).toInt, Customer(c(0).toInt, c(1) ))
@@ -27,44 +27,62 @@ object SAMPLE_NestedRDD {
       o => (o(0).toInt, Order(o(0).toInt, o(1).toInt, o(2) ))
     )
     val orderLine = sc.textFile(getClass.getResource("fake-orderLine-qn.csv").toString).map(_.split(";")).map(
-      ol => (ol(1).toInt, OrderLine(ol(0).toInt, ol(1).toInt, ol(2), ol(3).toInt))
+      ol => (ol(1).toInt, OrderLine(ol(0).toInt, ol(1).toInt, ol(3).toInt))
     )
 
+    case class mainCustomer (customerId: Int, name: String, order: mainOrder)
+    case class mainOrder (orderId: Int, customerId: Int, orderName: String, orderLine: mainOrderLine)
+    case class mainOrderLine (orderLineId: Int, orderId: Int, lineAmount: Int )
+
+
+    val x = List("a" -> "b", "c" -> "d", "a" -> "f")
+    //x: List[(java.lang.String, java.lang.String)] = List((a,b), (c,d), (a,f))
+    val x1 = x.groupBy(_._1)
+    val x2 = x.groupBy(_._1).map { case (k,v) => (k,v.map(_._2))}
+    println("--------")
+    x1.foreach(println)
+    println("--------")
+    x2.foreach(println)
 
     println("--------")
-    val tuple_o_ol = order.cogroup(orderLine).map(x => (x._2._1.head.customerId, (
+    /*val tuple_o_ol = order.cogroup(orderLine).map(x => (x._2._1.head.customerId, (
       x._2._1.head.orderId,
+      x._2._1.head.customerId,
       x._2._1.head.orderName,
       x._2._2.toList
-    )))
+    )))*/
+
+    val tuple_o_ol = order.cogroup(orderLine).map { case (k,v) => (v._1.head.customerId,(v._1,v._2)) }
     tuple_o_ol.foreach(println)
 
     println("--------")
     val tuple = customer.cogroup(tuple_o_ol)
+    //val tuple = customer.cogroup(order.cogroup(orderLine))
     tuple.foreach(println)
+
 
 
     val r1 = tuple.map((t) => {
       val custBson = new BasicBSONObject()
       val orderBsonList = new BasicBSONList()
-      val orderLineBsonList = new BasicBSONList()
-
       custBson.put("customerId", t._2._1.head.customerId)
       custBson.put("name", t._2._1.head.name)
 
       t._2._2.foreach { o =>
         val orderBson = new BasicBSONObject()
-        orderBson.put("id", o._1)
-        orderBson.put("orderDescription", o._2)
+        val orderLineBsonList = new BasicBSONList()
+        orderBson.put("id", o._1.head.orderId)
+        orderBson.put("customerId", o._1.head.customerId)
+        orderBson.put("orderDescription", o._1.head.orderName)
 
-        t._2._2.head._3.foreach { (ol: OrderLine) =>
+        o._2.foreach { (ol: OrderLine) =>
           val orderLineBson = new BasicBSONObject()
           orderLineBson.put("id", ol.orderLineId)
+          orderLineBson.put("orderId", ol.orderId)
           orderLineBson.put("amout", ol.lineAmount)
           orderLineBsonList.add(orderLineBson)
         }
         orderBson.put("orderlines", orderLineBsonList)
-
         orderBsonList.add(orderBson)
       }
       custBson.put("orders", orderBsonList)
@@ -73,6 +91,8 @@ object SAMPLE_NestedRDD {
     })
 
     r1.saveAsNewAPIHadoopFile("file:///bogus", classOf[Any], classOf[Any], classOf[com.mongodb.hadoop.MongoOutputFormat[Any, Any]], mongoCustomerConf)
+
+
 
   }
 
