@@ -71,7 +71,12 @@ object SAMPLE_NestedCustomerWithReduceOrder {
     orderLineMap.sortByKey().foreach(println)
 
     println("----orderLineReduce----")
-    val orderLineReduce = orderLineMap.reduceByKey((a, b) => OrderLineStat(b.orderId, (a.avg+b.avg)/(a.sum+b.sum), a.sum + b.sum, if (a.avg > b.avg) a.avg else b.avg, if(b.isGoodLine == true) true else false))
+    val orderLineReduce = orderLineMap.reduceByKey((a, b) => OrderLineStat(
+      b.orderId,
+      (a.avg+b.avg)/(a.sum+b.sum),
+      a.sum + b.sum,
+      if (a.avg > b.avg) a.avg else b.avg,
+       if(b.isGoodLine == true) true else false))
     orderLineReduce.sortByKey().foreach(println)
 
     println("----Join----")
