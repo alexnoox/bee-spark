@@ -28,11 +28,11 @@ object SAMPLE_CombineByKeyByKey {
       (acc1: (Int,Int), acc2:(Int,Int)) => (acc1._1 + acc2._1, acc1._2 + acc2._2) // Combine C,C to C
     )
 
-    println("----------")
+    println("----result combine------")
     result.foreach(println)
 
     println("----------")
-    result.map{case (key, value) => (key, value._1 / value._2.toFloat)}.foreach(println)
+    result.map{case (key, value) => (key, value._1 / value._2.toFloat, value._1, value._1 * value._1, if (value._1 > 10) true else false)}.foreach(println)
 
   }
 

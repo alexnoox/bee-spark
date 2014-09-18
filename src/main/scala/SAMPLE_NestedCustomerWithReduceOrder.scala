@@ -20,10 +20,8 @@ object SAMPLE_NestedCustomerWithReduceOrder {
     case class CustomerIn (customerId: Int, name: String, isGoldCustomer: Boolean)
     case class ContactIn (contactId: Int, customerId: Int, firstName: String,  lastName: String, email: String, tel: String, avatar: String)
     case class OrderIn (orderId: Int, customerId: Int, orderName: String, total: Double, maxLineAmout: Double, isGoodOrder: Boolean )
-    case class OrderLineIn (orderLineId: Int, orderId: Int, amount: Double, sum: Int, isGoodLine: Boolean){
-    }
-    case class OrderLineStat (orderId: Int, avg: Double, sum: Int, maxLineAmout: Double,isGoodLine: Boolean){
-    }
+    case class OrderLineIn (orderLineId: Int, orderId: Int, amount: Double){}
+    case class OrderLineStat (orderId: Int, avg: Double, sum: Int, maxLineAmout: Double,isGoodLine: Boolean){}
 
     println("----customer----")
     val customer = sc.textFile(getClass.getResource("fake-customer-qn.csv").toString).map(_.split(";")).map(
@@ -45,7 +43,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
 
     println("----orderLine----")
     val orderLine = sc.textFile(getClass.getResource("fake-orderLine-qn.csv").toString).map(_.split(";")).map(
-        ol => (ol(1).toInt, OrderLineIn(ol(0).toInt, ol(1).toInt, ol(3).toDouble, 1, false))
+        ol => (ol(1).toInt, OrderLineIn(ol(0).toInt, ol(1).toInt, ol(3).toDouble))
     )
     orderLine.foreach(println)
 
@@ -54,8 +52,6 @@ object SAMPLE_NestedCustomerWithReduceOrder {
       val (sum, count) = numbers.map(n => (n, 1)).reduce{ (a, b) => (a._1 + b._1, a._2 + b._2) }
       sum / count
     }
-
-
 
     println("----orderLineMap----")
     val orderLineMap = orderLine
@@ -70,27 +66,28 @@ object SAMPLE_NestedCustomerWithReduceOrder {
       ))}
     orderLineMap.sortByKey().foreach(println)
 
-    println("----orderLineReduce----")
-    val orderLineReduce = orderLineMap.reduceByKey((a, b) => OrderLineStat(
+    println("----orderLineReduceToOrder----")
+    val orderLineReduceToOrder = orderLineMap.reduceByKey((a, b) => OrderLineStat(
       b.orderId,
-      (a.avg+b.avg)/(a.sum+b.sum),
+      (a.maxLineAmout+b.maxLineAmout)/(a.sum+b.sum),
       a.sum + b.sum,
       if (a.avg > b.avg) a.avg else b.avg,
-       if(b.isGoodLine == true) true else false))
-    orderLineReduce.sortByKey().foreach(println)
+      if(b.isGoodLine == true) true else false)
+    )
+    orderLineReduceToOrder.sortByKey().foreach(println)
 
-    println("----Join----")
-    val tuplejoin = order.join(orderLineReduce).map(x => (x._2._1.customerId, OrderIn(
+    println("----orderjoin----")
+    val orderjoin = order.join(orderLineReduceToOrder).map(x => (x._2._1.customerId, OrderIn(
       x._2._1.orderId,
       x._2._1.customerId,
       x._2._1.orderName,
       x._2._1.maxLineAmout,
       x._2._2.avg,
       x._2._2.isGoodLine)))
-    tuplejoin.foreach(println)
+    orderjoin.foreach(println)
 
     println("--------")
-    val tuple = customer.cogroup(tuplejoin).cogroup(contact)
+    val tuple = customer.cogroup(orderjoin).cogroup(contact)
 
     val r1 = tuple.map((t) => {
       val custBson = new BasicBSONObject()
