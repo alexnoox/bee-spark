@@ -14,7 +14,7 @@ import scala.collection.immutable.HashMap
 
 import helpers.HadoopHelper
 
-object CustomerService {
+object SAMPLE_SqlJoinWithMongo {
   def main(args: Array[String]) {
     // Spark Context setup
     val conf = new SparkConf().setMaster("local").setAppName("Bee-Spark")

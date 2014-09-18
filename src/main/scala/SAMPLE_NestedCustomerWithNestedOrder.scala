@@ -1,10 +1,11 @@
 import org.apache.hadoop.mapred.JobConf
 import org.apache.spark.SparkContext._
 import org.apache.spark._
+import org.apache.spark.rdd.RDD
 import org.bson.BasicBSONObject
 import org.bson.types.BasicBSONList
 
-object SAMPLE_NestedRDD {
+object SAMPLE_NestedCustomerWithNestedOrder {
   def main(args: Array[String]) {
     // Spark Context setup
     val conf = new SparkConf().setMaster("local").setAppName("Bee-Spark")
@@ -18,8 +19,8 @@ object SAMPLE_NestedRDD {
 
     case class Customer (customerId: Int, name: String)
     case class Contact (contactId: Int, customerId: Int, firstName: String,  lastName: String, email: String, tel: String, avatar: String)
-    case class Order (orderId: Int, customerId: Int, orderName: String)
-    case class OrderLine (orderLineId: Int, orderId: Int, lineAmount: Int )
+    case class Order (orderId: Int, customerId: Int, orderName: String )
+    case class OrderLine (orderLineId: Int, orderId: Int, lineAmount: Double )
 
     val customer = sc.textFile(getClass.getResource("fake-customer-qn.csv").toString).map(_.split(";")).map(
       c => (c(0).toInt, Customer(c(0).toInt, c(1) ))
@@ -28,27 +29,15 @@ object SAMPLE_NestedRDD {
       c => (c(1).toInt, Contact(c(0).toInt, c(1).toInt, c(2), c(3), c(4), c(5), c(6) ))
     )
     val order = sc.textFile(getClass.getResource("fake-order-qn.csv").toString).map(_.split(";")).map(
-      o => (o(0).toInt, Order(o(0).toInt, o(1).toInt, o(2) ))
+      o => (o(0).toInt, Order(o(0).toInt, o(1).toInt, o(2)))
     )
     val orderLine = sc.textFile(getClass.getResource("fake-orderLine-qn.csv").toString).map(_.split(";")).map(
-      ol => (ol(1).toInt, OrderLine(ol(0).toInt, ol(1).toInt, ol(3).toInt))
+      ol => (ol(1).toInt, OrderLine(ol(0).toInt, ol(1).toInt, ol(3).toDouble))
     )
-
-
-    /*
-    val x = List("a" -> "b", "c" -> "d", "a" -> "f")
-    val x1 = x.groupBy(_._1)
-    //(a,List((a,b), (a,f)))
-    //(c,List((c,d)))
-    val x2 = x.groupBy(_._1).map { case (k,v) => (k,v.map(_._2))}
-    //(a,List(b, f))
-    //(c,List(d))
-    */
-
 
     println("--------")
     val tuple = customer.cogroup(
-      order.cogroup(orderLine).map { case (k,v) => (v._1.head.customerId,(v._1,v._2)) }
+      order.cogroup(orderLine).map({ case (k,v) => (v._1.head.customerId,(v._1,v._2)) })
     ).cogroup(contact)
 
     val r1 = tuple.map((t) => {
@@ -79,15 +68,20 @@ object SAMPLE_NestedRDD {
         orderBson.put("customerId", o._1.head.customerId)
         orderBson.put("orderDescription", o._1.head.orderName)
 
+        var total = 0.0
         o._2.foreach { (ol: OrderLine) =>
           val orderLineBson = new BasicBSONObject()
           orderLineBson.put("id", ol.orderLineId)
           orderLineBson.put("orderId", ol.orderId)
           orderLineBson.put("amout", ol.lineAmount)
+          total = total + ol.lineAmount
           orderLineBsonList.add(orderLineBson)
         }
+
+        orderBson.put("orderAmout", total)
         orderBson.put("orderlines", orderLineBsonList)
         orderBsonList.add(orderBson)
+
       }
       custBson.put("orders", orderBsonList)
 
@@ -96,6 +90,11 @@ object SAMPLE_NestedRDD {
 
     r1.saveAsNewAPIHadoopFile("file:///bogus", classOf[Any], classOf[Any], classOf[com.mongodb.hadoop.MongoOutputFormat[Any, Any]], mongoCustomerConf)
 
+  }
+
+  def average(numbers: RDD[Int]): Int = {
+    val(sum, count) = numbers.map(n => (n, 1)).reduce{(a, b) => (a._1 + b._1, a._2 + b._2)}
+    sum/count
   }
 
 }
