@@ -19,9 +19,9 @@ object SAMPLE_NestedCustomerWithReduceOrder {
 
     case class CustomerIn (customerId: Int, name: String, isGoldCustomer: Boolean)
     case class ContactIn (contactId: Int, customerId: Int, firstName: String,  lastName: String, email: String, tel: String, avatar: String)
-    case class OrderIn (orderId: Int, customerId: Int, orderName: String, total: Double, maxLineAmout: Double, isGoodOrder: Boolean )
-    case class OrderLineIn (orderLineId: Int, orderId: Int, amount: Double){}
-    case class OrderLineStat (orderId: Int, avg: Double, sum: Int, maxLineAmout: Double,isGoodLine: Boolean){}
+    case class Order (orderId: Int, customerId: Int, orderName: String, total: Double, average: Double, max: Double, isGoodOrder: Boolean )
+    case class OrderLine (orderLineId: Int, orderId: Int, amount: Double, max: Double, sum: Int){}
+    //case class OrderLineStat (orderId: Int, lineAmout: Double, sum: Int, maxLineAmout: Double, isGoodLine: Boolean){}
 
     println("----customer----")
     val customer = sc.textFile(getClass.getResource("fake-customer-qn.csv").toString).map(_.split(";")).map(
@@ -36,58 +36,46 @@ object SAMPLE_NestedCustomerWithReduceOrder {
     contact.foreach(println)
 
     println("----order----")
-    val order = sc.textFile(getClass.getResource("fake-order-qn.csv").toString).map(_.split(";")).map(
-        o => (o(0).toInt, OrderIn(o(0).toInt, o(1).toInt, o(2), 0, 0, false))
+    var order = sc.textFile(getClass.getResource("fake-order-qn.csv").toString).map(_.split(";")).map(
+        o => (o(0).toInt, Order(o(0).toInt, o(1).toInt, o(2), 0, 0, 0, false))
     )
     order.foreach(println)
 
     println("----orderLine----")
-    val orderLine = sc.textFile(getClass.getResource("fake-orderLine-qn.csv").toString).map(_.split(";")).map(
-        ol => (ol(1).toInt, OrderLineIn(ol(0).toInt, ol(1).toInt, ol(3).toDouble))
+    var orderLine = sc.textFile(getClass.getResource("fake-orderLine-qn.csv").toString).map(_.split(";")).map(
+        ol => (ol(1).toInt, OrderLine(ol(0).toInt, ol(1).toInt, ol(3).toDouble, 0, 1))
     )
     orderLine.foreach(println)
 
-    //code matei
-    def average(numbers: RDD[Int]): Int = {
-      val (sum, count) = numbers.map(n => (n, 1)).reduce{ (a, b) => (a._1 + b._1, a._2 + b._2) }
-      sum / count
-    }
+    println("----orderLine----")
+    orderLine = orderLine
+      .reduceByKey((a, b) =>
+      OrderLine(
+        a.orderLineId, //orderLineId
+        a.orderId, //orderId
+        a.amount + b.amount, //amout
+        a.amount + b.amount / 10, //max
+        a.sum + b.sum //orderline number
+      ))
+    orderLine.sortByKey().foreach(println)
 
-    println("----orderLineMap----")
-    val orderLineMap = orderLine
-      .map{ case x => (
-      x._2.orderId,
-      OrderLineStat(
-          x._2.orderId,
-          x._2.amount,
-          1,
-          x._2.amount,
-          if (x._2.amount > 100) true else false
-      ))}
-    orderLineMap.sortByKey().foreach(println)
-
-    println("----orderLineReduceToOrder----")
-    val orderLineReduceToOrder = orderLineMap.reduceByKey((a, b) => OrderLineStat(
-      b.orderId,
-      (a.maxLineAmout+b.maxLineAmout)/(a.sum+b.sum),
-      a.sum + b.sum,
-      if (a.avg > b.avg) a.avg else b.avg,
-      if(b.isGoodLine == true) true else false)
-    )
-    orderLineReduceToOrder.sortByKey().foreach(println)
-
-    println("----orderjoin----")
-    val orderjoin = order.join(orderLineReduceToOrder).map(x => (x._2._1.customerId, OrderIn(
-      x._2._1.orderId,
+    println("----order----")
+    order = order.join(orderLine)
+      .map(x => (
       x._2._1.customerId,
-      x._2._1.orderName,
-      x._2._1.maxLineAmout,
-      x._2._2.avg,
-      x._2._2.isGoodLine)))
-    orderjoin.foreach(println)
+        Order(
+          x._2._1.orderId, //orderId
+          x._2._1.customerId, //customerId
+          x._2._1.orderName, //name
+          x._2._2.amount, //total
+          x._2._2.amount/x._2._2.sum,
+          x._2._2.max,//if (a.amount > b.amount) a.amount else b.amount,
+          if (x._2._2.amount > 100) true else false //isGoodDeal
+        )))
+    order.sortByKey().foreach(println)
 
     println("--------")
-    val tuple = customer.cogroup(orderjoin).cogroup(contact)
+    val tuple = customer.cogroup(order).cogroup(contact)
 
     val r1 = tuple.map((t) => {
       val custBson = new BasicBSONObject()
@@ -117,8 +105,9 @@ object SAMPLE_NestedCustomerWithReduceOrder {
         orderBson.put("customerId", o.customerId)
         orderBson.put("orderDescription", o.orderName)
         orderBson.put("orderTotal", o.total)
-        orderBson.put("maxLineAmout", o.maxLineAmout)
-        orderBson.put("orderIsGoodDeal", o.isGoodOrder)
+        orderBson.put("avergae", o.average)
+        orderBson.put("max", o.max)
+        orderBson.put("isGoodDeal", o.isGoodOrder)
 
         /*var total = 0.0
         o._2.foreach { (ol: OrderLine) =>
