@@ -71,7 +71,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
     contact.foreach(println)
 
     println("----order----")
-    var orderIn = sc.textFile(getClass.getResource("fake-order-qn.csv").toString).map(_.split(";")).map(
+    val orderIn = sc.textFile(getClass.getResource("fake-order-qn.csv").toString).map(_.split(";")).map(
         o => (o(0).toInt, OrderIn(o(0).toInt, o(1).toInt, o(2), 1))
     )
     orderIn.foreach(println)
