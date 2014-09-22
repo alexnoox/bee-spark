@@ -17,25 +17,31 @@ object SAMPLE_NestedCustomerWithReduceOrder {
 
     val format = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss")
 
-    case class CustomerIn (customerId: Int,
-                           name: String,
-                           isGoldCustomer: Boolean)
-
     case class Contact (contactId: Int,
-                          customerId: Int,
-                          firstName: String,
-                          lastName: String,
-                          email: String,
-                          tel: String,
-                          avatar: String)
+                        customerId: Int,
+                        firstName: String,
+                        lastName: String,
+                        email: String,
+                        tel: String,
+                        avatar: String)
 
+    case class Customer (customerId: Int,
+                         name: String,
+                         total: Double,
+                         numberOfOrder: Int,
+                         avg: Double,
+                         max: Double)
+
+    case class CustomerIn (customerId: Int,
+                           name: String)
 
     case class OrderStat (orderId: Int,
-                      customerId: Int,
-                      orderName: String,
-                      total: Double,
-                      numberOfOrder: Int)
-
+                          customerId: Int,
+                          orderName: String,
+                          total: Double,
+                          numberOfOrder: Int,
+                          avg: Double,
+                          max: Double)
 
     case class Order (customerId: Int,
                       orderId: Int,
@@ -44,19 +50,19 @@ object SAMPLE_NestedCustomerWithReduceOrder {
                       numberOfLine: Int)
 
     case class OrderIn (orderId: Int,
-                          customerId: Int,
-                          orderName: String,
-                          numberOfOrder: Int)
+                        customerId: Int,
+                        orderName: String,
+                        numberOfOrder: Int)
 
     case class OrderLineStat (orderId: Int,
-                          total: Double,
-                          numberOfLine: Int)
+                              total: Double,
+                              numberOfLine: Int)
 
     println("----customer----")
-    val customer = sc.textFile(getClass.getResource("fake-customer-qn.csv").toString).map(_.split(";")).map(
-        c => (c(0).toInt, CustomerIn(c(0).toInt, c(1), false ))
+    val customerIn = sc.textFile(getClass.getResource("fake-customer-qn.csv").toString).map(_.split(";")).map(
+        c => (c(0).toInt, CustomerIn(c(0).toInt, c(1) ))
     )
-    customer.foreach(println)
+    customerIn.foreach(println)
 
     println("----contact----")
     val contact = sc.textFile(getClass.getResource("fake-contact-qn.csv").toString).map(_.split(";")).map(
@@ -81,32 +87,13 @@ object SAMPLE_NestedCustomerWithReduceOrder {
     order.sortByKey().foreach(println)
 
 
-    /*println("----order----")
-    val order = orderIn.join(orderLineStat)
-      .map(x => (
-      x._2._1.orderId,
-        Order(
-        x._2._1.customerId,
-        x._2._1.orderId,
-        x._2._1.orderName,
-        x._2._2.total,
-        x._2._2.numberOfLine
-      )))
-    order.sortByKey().foreach(println)*/
-
-
     println("----orderStat----")
-    val orderStat = order.map( {case (k,v) => (v.customerId, (v.orderId, v.customerId, v.orderName, v.total, v.numberOfLine))} )
-      .reduceByKey({ case ((a1, b1, c1, d1, e1), (a2, b2, c2, d2, e2)) => (a1, b1, c1, d1+d2, e1+e2 ) })
-      .map({ case (k, (i1, i2, name, sum, count) ) => (i2, OrderStat(i1, i2, name, sum, count) ) })
-
-    orderStat.sortByKey().foreach(println)
-
-
-
-
-
-
+    val customer = order.map( {case (k,v) => (v.customerId, (v.orderId, v.customerId, v.orderName, v.total, v.numberOfLine, v.total))} )
+      .reduceByKey({ case ((a1, b1, c1, d1, e1,f1), (a2, b2, c2, d2, e2, f2)) => (a1, b1, c1, d1+d2, e1+e2, if (f1 > f2) f1 else f2 ) })
+      .map({ case (k, (i1, i2, name, sum, count, max) ) => (i2, OrderStat(i1, i2, name, sum, count, sum/count, max) ) })
+      .join(customerIn)
+      .map({ case (k,v) => (v._2.customerId, Customer(v._2.customerId, v._2.name, v._1.total, v._1.numberOfOrder, v._1.avg, v._1.max))})
+    customer.sortByKey().foreach(println)
 
 
     println("--------")
@@ -119,6 +106,9 @@ object SAMPLE_NestedCustomerWithReduceOrder {
 
       custBson.put("customerId", t._2._1.head._1.head.customerId)
       custBson.put("name", t._2._1.head._1.head.name)
+      custBson.put("total", t._2._1.head._1.head.total)
+      custBson.put("max", t._2._1.head._1.head.max)
+      custBson.put("avg", t._2._1.head._1.head.avg)
 
       t._2._2.foreach { (c: Contact) =>
         val contactBson = new BasicBSONObject()
