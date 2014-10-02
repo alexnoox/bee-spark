@@ -1,9 +1,26 @@
-import org.apache.hadoop.mapred.JobConf
+import helpers.HadoopHelper
+import org.apache.hadoop.fs.Path
+import org.apache.hadoop.io.{NullWritable, Text, MapWritable}
+import org.apache.hadoop.mapred.{FileOutputFormat, FileOutputCommitter, JobConf}
 import org.apache.spark.SparkContext._
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
+import org.apache.spark.serializer.KryoSerializer
 import org.bson.BasicBSONObject
 import org.bson.types.BasicBSONList
+import org.elasticsearch.hadoop.cfg.ConfigurationOptions
+import org.elasticsearch.hadoop.mr.EsOutputFormat
+import org.elasticsearch.spark._
+
+import scala.collection.immutable.HashMap
+
+case class Customer (customerId: Int,
+                     name: String,
+                     total: Double,
+                     numberOfOrder: Int,
+                     avg: Double,
+                     max: Double)
+
 
 object SAMPLE_NestedCustomerWithReduceOrder {
   def main(args: Array[String]) {
@@ -11,9 +28,20 @@ object SAMPLE_NestedCustomerWithReduceOrder {
     // Spark Context setup
     val conf = new SparkConf().setMaster("local").setAppName("Bee-Spark")
     val sc = new SparkContext(conf)
+    sc.setLocalProperty("spark.serializer", classOf[KryoSerializer].getName)
 
-    val mongoCustomerConf = new JobConf(sc.hadoopConfiguration)
-    mongoCustomerConf.set("mongo.output.uri", "mongodb://127.0.0.1:27017/abo.customer")
+    // Elasticsearch-Hadoop setup
+    val esJobConf = new JobConf(sc.hadoopConfiguration)
+    esJobConf.setOutputFormat(classOf[EsOutputFormat])
+    esJobConf.setOutputCommitter(classOf[FileOutputCommitter])
+    esJobConf.set(ConfigurationOptions.ES_NODES, "55.37.171.180")
+    esJobConf.set(ConfigurationOptions.ES_PORT, "9200")
+    esJobConf.set(ConfigurationOptions.ES_RESOURCE, "qn/customer") // index/type
+    FileOutputFormat.setOutputPath(esJobConf, new Path("-"))
+
+    // Mongo setup
+    val mongoJobConf = new JobConf(sc.hadoopConfiguration)
+    mongoJobConf.set("mongo.output.uri", "mongodb://127.0.0.1:27017/qn.customer")
 
     val format = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss")
 
@@ -25,12 +53,6 @@ object SAMPLE_NestedCustomerWithReduceOrder {
                         tel: String,
                         avatar: String)
 
-    case class Customer (customerId: Int,
-                         name: String,
-                         total: Double,
-                         numberOfOrder: Int,
-                         avg: Double,
-                         max: Double)
 
     case class CustomerIn (customerId: Int,
                            name: String)
@@ -150,13 +172,30 @@ object SAMPLE_NestedCustomerWithReduceOrder {
       (null, custBson)
     })
 
-    r1.saveAsNewAPIHadoopFile("file:///bogus", classOf[Any], classOf[Any], classOf[com.mongodb.hadoop.MongoOutputFormat[Any, Any]], mongoCustomerConf)
+    r1.saveAsNewAPIHadoopFile("file:///bogus", classOf[Any], classOf[Any], classOf[com.mongodb.hadoop.MongoOutputFormat[Any, Any]], mongoJobConf)
+
+    customer.map({case (k,v) => v}).map(rowToMap).saveToEs("qn/customer")
 
   }
 
+  def rowToMap(t: Customer) = {
+    val fields = HashMap(
+      "name" -> t.name,
+      "id" -> t.customerId
+    )
+    fields
+  }
+
+  def mapToWritable(in: Map[String, String]): (Object, Object) = {
+    val m = new MapWritable
+    for ((k, v) <- in)
+      m.put(new Text(k), new Text(v))
+    (NullWritable.get, m)
+  }
   def average(numbers: RDD[Int]): Int = {
     val(sum, count) = numbers.map(n => (n, 1)).reduce{(a, b) => (a._1 + b._1, a._2 + b._2)}
     sum/count
   }
+
 
 }

@@ -5,7 +5,7 @@ import org.bson.BasicBSONObject
 import org.bson.types.BasicBSONList
 
 
-object SAMPLE_CombineByKeyByKey {
+object SAMPLE_CombineByKey {
   def main(args: Array[String]) {
 
     // Spark Context setup

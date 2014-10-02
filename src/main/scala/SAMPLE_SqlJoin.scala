@@ -1,3 +1,4 @@
+/*
 import org.apache.spark._
 import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
@@ -73,3 +74,4 @@ object SAMPLE_SqlJoin {
     fields
   }
 }
+*/
