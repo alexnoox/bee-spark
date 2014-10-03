@@ -19,7 +19,8 @@ case class Customer (customerId: Int,
                      total: Double,
                      numberOfOrder: Int,
                      avg: Double,
-                     max: Double)
+                     max: Double,
+                     range : Int)
 
 
 object SAMPLE_NestedCustomerWithReduceOrder {
@@ -97,7 +98,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
 
 
     println("----orderLine IN----")
-    val orderLineIn = sc.textFile(getClass.getResource("fake-orderLine-qn.csv").toString).map(_.split(";")).map(ol => (ol(1).toInt, (ol(0).toInt, ol(1).toInt, ol(4).toDouble, 1)) )
+    val orderLineIn = sc.textFile(getClass.getResource("fake-orderLine-qn.csv").toString).map(_.split(";")).map(ol => (ol(1).toInt, (ol(0).toInt, ol(1).toInt, ol(7).toDouble, 1)) )
 
 
     println("----order----")
@@ -114,7 +115,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
       .reduceByKey({ case ((a1, b1, c1, d1, e1,f1), (a2, b2, c2, d2, e2, f2)) => (a1, b1, c1, d1+d2, e1+e2, if (f1 > f2) f1 else f2 ) })
       .map({ case (k, (i1, i2, name, sum, count, max) ) => (i2, OrderStat(i1, i2, name, sum, count, sum/count, max) ) })
       .join(customerIn)
-      .map({ case (k,v) => (v._2.customerId, Customer(v._2.customerId, v._2.name, v._1.total, v._1.numberOfOrder, v._1.avg, v._1.max))})
+      .map({ case (k,v) => (v._2.customerId, Customer(v._2.customerId, v._2.name, v._1.total, v._1.numberOfOrder, v._1.avg, v._1.max, totalToRange(v._1.total)))})
     customer.sortByKey().foreach(println)
 
 
@@ -131,6 +132,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
       custBson.put("total", t._2._1.head._1.head.total)
       custBson.put("max", t._2._1.head._1.head.max)
       custBson.put("avg", t._2._1.head._1.head.avg)
+      custBson.put("range", t._2._1.head._1.head.range)
 
       t._2._2.foreach { (c: ContactIn) =>
         val contactBson = new BasicBSONObject()
@@ -187,17 +189,23 @@ object SAMPLE_NestedCustomerWithReduceOrder {
       "total" -> t.total,
       "max" -> t.max,
       "avg" -> t.avg,
-      "numberOfOrder" -> t.numberOfOrder
+      "numberOfOrder" -> t.numberOfOrder,
+      "range" -> t.range
     )
     fields
   }
 
-  def mapToWritable(in: Map[String, String]): (Object, Object) = {
-    val m = new MapWritable
-    for ((k, v) <- in)
-      m.put(new Text(k), new Text(v))
-    (NullWritable.get, m)
+  def totalToRange(total: Double): Int = {
+    var range = 0
+    if(total > 6000) range = 5
+    else if(total > 5500) range = 4
+    else if(total > 4500) range = 3
+    else if(total > 3500) range = 2
+    else if(total > 2500) range = 1
+    else if(total > 0000) range = 0
+    range
   }
+
   def average(numbers: RDD[Int]): Int = {
     val(sum, count) = numbers.map(n => (n, 1)).reduce{(a, b) => (a._1 + b._1, a._2 + b._2)}
     sum/count
