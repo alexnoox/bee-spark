@@ -31,13 +31,13 @@ object SAMPLE_NestedCustomerWithReduceOrder {
     sc.setLocalProperty("spark.serializer", classOf[KryoSerializer].getName)
 
     // Elasticsearch-Hadoop setup
-    val esJobConf = new JobConf(sc.hadoopConfiguration)
-    esJobConf.setOutputFormat(classOf[EsOutputFormat])
-    esJobConf.setOutputCommitter(classOf[FileOutputCommitter])
-    esJobConf.set(ConfigurationOptions.ES_NODES, "55.37.171.180")
-    esJobConf.set(ConfigurationOptions.ES_PORT, "9200")
-    esJobConf.set(ConfigurationOptions.ES_RESOURCE, "qn/customer") // index/type
-    FileOutputFormat.setOutputPath(esJobConf, new Path("-"))
+//    val esJobConf = new JobConf(sc.hadoopConfiguration)
+//    esJobConf.setOutputFormat(classOf[EsOutputFormat])
+//    esJobConf.setOutputCommitter(classOf[FileOutputCommitter])
+//    esJobConf.set(ConfigurationOptions.ES_NODES, "localhost")
+//    esJobConf.set(ConfigurationOptions.ES_PORT, "9200")
+//    esJobConf.set(ConfigurationOptions.ES_RESOURCE, "fta/customer") // index/type
+//    FileOutputFormat.setOutputPath(esJobConf, new Path("-"))
 
     // Mongo setup
     val mongoJobConf = new JobConf(sc.hadoopConfiguration)
@@ -51,7 +51,8 @@ object SAMPLE_NestedCustomerWithReduceOrder {
                         lastName: String,
                         email: String,
                         tel: String,
-                        avatar: String)
+                        avatar: String,
+                        typo: String)
 
 
     case class CustomerIn (customerId: Int,
@@ -84,7 +85,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
 
     println("----contact IN----")
     val contactIn = sc.textFile(getClass.getResource("fake-contact-qn.csv").toString).map(_.split(";")).map(
-        c => (c(1).toInt, ContactIn(c(0).toInt, c(1).toInt, c(2), c(3), c(4), c(5), c(6) ))
+        c => (c(1).toInt, ContactIn(c(0).toInt, c(1).toInt, c(2), c(3), c(4), c(5), c(6), c(7) ))
     )
     contactIn.take(2).foreach(println)
 
@@ -140,6 +141,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
         contactBson.put("email", c.email)
         contactBson.put("phone", c.tel)
         contactBson.put("avatar", c.avatar)
+        contactBson.put("type", c.typo)
         customerBsonList.add(contactBson)
       }
       custBson.put("contacts", customerBsonList)
@@ -180,8 +182,12 @@ object SAMPLE_NestedCustomerWithReduceOrder {
 
   def rowToMap(t: Customer) = {
     val fields = HashMap(
+      "id" -> t.customerId,
       "name" -> t.name,
-      "id" -> t.customerId
+      "total" -> t.total,
+      "max" -> t.max,
+      "avg" -> t.avg,
+      "numberOfOrder" -> t.numberOfOrder
     )
     fields
   }
