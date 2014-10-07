@@ -1,3 +1,6 @@
+import java.text.SimpleDateFormat
+import java.util.Date
+
 import helpers.HadoopHelper
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.{NullWritable, Text, MapWritable}
@@ -14,13 +17,6 @@ import org.elasticsearch.spark._
 
 import scala.collection.immutable.HashMap
 
-case class Customer (customerId: Int,
-                     name: String,
-                     total: Double,
-                     numberOfOrder: Int,
-                     avg: Double,
-                     max: Double,
-                     range : Int)
 
 
 object SAMPLE_NestedCustomerWithReduceOrder {
@@ -59,6 +55,13 @@ object SAMPLE_NestedCustomerWithReduceOrder {
     case class CustomerIn (customerId: Int,
                            name: String)
 
+    case class OrderIn (orderId: Int,
+                        customerId: Int,
+                        orderName: String,
+                        numberOfOrder: Int,
+                        date: Date)
+
+
     case class OrderStat (orderId: Int,
                           customerId: Int,
                           orderName: String,
@@ -67,11 +70,21 @@ object SAMPLE_NestedCustomerWithReduceOrder {
                           avg: Double,
                           max: Double)
 
+    case class Customer (customerId: Int,
+                         name: String,
+                         total: Double,
+                         numberOfOrder: Int,
+                         avg: Double,
+                         max: Double,
+                         range : Int)
+
+
     case class Order (customerId: Int,
                       orderId: Int,
                       orderName: String,
                       total: Double,
-                      numberOfLine: Int)
+                      numberOfLine: Int,
+                      date : Date)
 
 
     case class OrderLineStat (orderId: Int,
@@ -82,23 +95,22 @@ object SAMPLE_NestedCustomerWithReduceOrder {
     val customerIn = sc.textFile(getClass.getResource("fake-customer-qn.csv").toString).map(_.split(";")).map(
         c => (c(0).toInt, CustomerIn(c(0).toInt, c(1) ))
     )
-    customerIn.take(2).foreach(println)
+    customerIn.take(100).foreach(println)
 
     println("----contact IN----")
     val contactIn = sc.textFile(getClass.getResource("fake-contact-qn.csv").toString).map(_.split(";")).map(
         c => (c(1).toInt, ContactIn(c(0).toInt, c(1).toInt, c(2), c(3), c(4), c(5), c(6), c(7) ))
     )
-    contactIn.take(2).foreach(println)
+    contactIn.take(100).foreach(println)
 
     println("----order IN----")
-    case class OrderIn (orderId: Int, customerId: Int, orderName: String, numberOfOrder: Int)
     val orderIn = sc.textFile(getClass.getResource("fake-order-qn.csv").toString).map(_.split(";")).map(
-        o => (o(0).toInt, OrderIn(o(0).toInt, o(1).toInt, o(2), 1)))
-    orderIn.take(2).foreach(println)
-
+        o => (o(0).toInt, OrderIn(o(0).toInt, o(1).toInt, o(2), 1, format.parse(o(3)))))
+    orderIn.take(100).foreach(println)
 
     println("----orderLine IN----")
     val orderLineIn = sc.textFile(getClass.getResource("fake-orderLine-qn.csv").toString).map(_.split(";")).map(ol => (ol(1).toInt, (ol(0).toInt, ol(1).toInt, ol(7).toDouble, 1)) )
+    orderLineIn.take(100).foreach(println)
 
 
     println("----order----")
@@ -106,17 +118,20 @@ object SAMPLE_NestedCustomerWithReduceOrder {
       .reduceByKey({ case ((a1, b1, c1, d1), (a2, b2, c2, d2)) => (a1, b1, c1 + c2, d1 + d2) })
       .map({ case (k, (i1, i2, sum, count) ) => (k, OrderLineStat(i2, sum, count) ) })
       .join(orderIn)
-      .map({ case (k,v) => (v._2.customerId, Order(v._2.customerId, v._2.orderId, v._2.orderName, v._1.total, v._1.numberOfLine))})
-    order.sortByKey().foreach(println)
+      .map({ case (k,v) => (v._2.customerId, Order(v._2.customerId, v._2.orderId, v._2.orderName, v._1.total, v._1.numberOfLine, v._2.date))})
+    order.sortByKey().take(100).foreach(println)
 
+
+    val sdf = new SimpleDateFormat("yyyy-MM-dd");
+    val dateLimite = sdf.parse("2010-01-01");
 
     println("----customer----")
-    val customer = order.map( {case (k,v) => (v.customerId, (v.orderId, v.customerId, v.orderName, v.total, 1, v.total))} )
-      .reduceByKey({ case ((a1, b1, c1, d1, e1,f1), (a2, b2, c2, d2, e2, f2)) => (a1, b1, c1, d1+d2, e1+e2, if (f1 > f2) f1 else f2 ) })
-      .map({ case (k, (i1, i2, name, sum, count, max) ) => (i2, OrderStat(i1, i2, name, sum, count, sum/count, max) ) })
+    val customer = order.map( {case (k,v) => (v.customerId, (v.orderId, v.customerId, v.orderName, if (v.date.after(dateLimite)) v.total else 0, 1, v.total, v.date))} )
+      .reduceByKey({ case ((a1, b1, c1, d1, e1, f1, date1), (a2, b2, c2, d2, e2, f2, date2)) => (a1, b1, c1, d1+d2, e1+e2, if (f1 > f2) f1 else f2, date1 ) })
+      .map({ case (k, (i1, i2, name, sum, count, max, date1) ) => (i2, OrderStat(i1, i2, name, sum, count, sum/count, max) ) })
       .join(customerIn)
       .map({ case (k,v) => (v._2.customerId, Customer(v._2.customerId, v._2.name, v._1.total, v._1.numberOfOrder, v._1.avg, v._1.max, totalToRange(v._1.total)))})
-    customer.sortByKey().foreach(println)
+    customer.sortByKey().take(100).foreach(println)
 
 
     println("--------")
@@ -155,6 +170,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
         orderBson.put("customerId", o.customerId)
         orderBson.put("orderDescription", o.orderName)
         orderBson.put("orderTotal", o.total)
+        orderBson.put("orderDate", o.date.toString)
 
         /*var total = 0.0
         o._2.foreach { (ol: OrderLine) =>
@@ -180,20 +196,21 @@ object SAMPLE_NestedCustomerWithReduceOrder {
 
     customer.map({case (k,v) => v}).map(rowToMap).saveToEs("qn/customer")
 
+
+    def rowToMap(t: Customer) = {
+      val fields = HashMap(
+        "id" -> t.customerId,
+        "name" -> t.name,
+        "total" -> t.total,
+        "max" -> t.max,
+        "avg" -> t.avg,
+        "numberOfOrder" -> t.numberOfOrder,
+        "range" -> t.range
+      )
+      fields
+    }
   }
 
-  def rowToMap(t: Customer) = {
-    val fields = HashMap(
-      "id" -> t.customerId,
-      "name" -> t.name,
-      "total" -> t.total,
-      "max" -> t.max,
-      "avg" -> t.avg,
-      "numberOfOrder" -> t.numberOfOrder,
-      "range" -> t.range
-    )
-    fields
-  }
 
   def totalToRange(total: Double): Int = {
     var range = 0
