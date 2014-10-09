@@ -28,13 +28,13 @@ object SAMPLE_NestedCustomerWithReduceOrder {
     sc.setLocalProperty("spark.serializer", classOf[KryoSerializer].getName)
 
     // Elasticsearch-Hadoop setup
-//    val esJobConf = new JobConf(sc.hadoopConfiguration)
-//    esJobConf.setOutputFormat(classOf[EsOutputFormat])
-//    esJobConf.setOutputCommitter(classOf[FileOutputCommitter])
-//    esJobConf.set(ConfigurationOptions.ES_NODES, "localhost")
-//    esJobConf.set(ConfigurationOptions.ES_PORT, "9200")
-//    esJobConf.set(ConfigurationOptions.ES_RESOURCE, "fta/customer") // index/type
-//    FileOutputFormat.setOutputPath(esJobConf, new Path("-"))
+    val esJobConf = new JobConf(sc.hadoopConfiguration)
+    esJobConf.setOutputFormat(classOf[EsOutputFormat])
+    esJobConf.setOutputCommitter(classOf[FileOutputCommitter])
+    esJobConf.set(ConfigurationOptions.ES_NODES, "172.20.10.2")
+    esJobConf.set(ConfigurationOptions.ES_PORT, "9200")
+    esJobConf.set(ConfigurationOptions.ES_RESOURCE, "qn/customer") // index/type
+    FileOutputFormat.setOutputPath(esJobConf, new Path("-"))
 
     // Mongo setup
     val mongoJobConf = new JobConf(sc.hadoopConfiguration)
@@ -57,6 +57,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
 
     case class OrderIn (orderId: Int,
                         customerId: Int,
+                        orderType: String,
                         orderName: String,
                         numberOfOrder: Int,
                         date: Date)
@@ -81,6 +82,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
 
     case class Order (customerId: Int,
                       orderId: Int,
+                      orderType: String,
                       orderName: String,
                       total: Double,
                       numberOfLine: Int,
@@ -105,7 +107,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
 
     println("----order IN----")
     val orderIn = sc.textFile(getClass.getResource("fake-order-qn.csv").toString).map(_.split(";")).map(
-        o => (o(0).toInt, OrderIn(o(0).toInt, o(1).toInt, o(2), 1, format.parse(o(3)))))
+        o => (o(0).toInt, OrderIn(o(0).toInt, o(1).toInt, o(2), o(3), 1, format.parse(o(4)))))
     orderIn.take(100).foreach(println)
 
     println("----orderLine IN----")
@@ -118,7 +120,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
       .reduceByKey({ case ((a1, b1, c1, d1), (a2, b2, c2, d2)) => (a1, b1, c1 + c2, d1 + d2) })
       .map({ case (k, (i1, i2, sum, count) ) => (k, OrderLineStat(i2, sum, count) ) })
       .join(orderIn)
-      .map({ case (k,v) => (v._2.customerId, Order(v._2.customerId, v._2.orderId, v._2.orderName, v._1.total, v._1.numberOfLine, v._2.date))})
+      .map({ case (k,v) => (v._2.customerId, Order(v._2.customerId, v._2.orderId, v._2.orderType, v._2.orderName, v._1.total, v._1.numberOfLine, v._2.date))})
     order.sortByKey().take(100).foreach(println)
 
 
@@ -166,8 +168,9 @@ object SAMPLE_NestedCustomerWithReduceOrder {
       t._2._1.head._2.foreach { o =>
         val orderBson = new BasicBSONObject()
         val orderLineBsonList = new BasicBSONList()
-        orderBson.put("id", o.orderId)
+        orderBson.put("orderId", o.orderId)
         orderBson.put("customerId", o.customerId)
+        orderBson.put("orderType", o.orderType)
         orderBson.put("orderDescription", o.orderName)
         orderBson.put("orderTotal", o.total)
         orderBson.put("orderDate", o.date.toString)
