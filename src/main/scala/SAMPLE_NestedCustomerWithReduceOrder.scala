@@ -173,7 +173,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
         orderBson.put("orderType", o.orderType)
         orderBson.put("orderDescription", o.orderName)
         orderBson.put("orderTotal", o.total)
-        orderBson.put("orderDate", o.date.toString)
+        orderBson.put("orderDate", o.date)
 
         /*var total = 0.0
         o._2.foreach { (ol: OrderLine) =>
