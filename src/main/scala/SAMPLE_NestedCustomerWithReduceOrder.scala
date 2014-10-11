@@ -111,7 +111,7 @@ object SAMPLE_NestedCustomerWithReduceOrder {
     orderIn.take(100).foreach(println)
 
     println("----orderLine IN----")
-    val orderLineIn = sc.textFile(getClass.getResource("fake-orderLine-qn.csv").toString).map(_.split(";")).map(ol => (ol(1).toInt, (ol(0).toInt, ol(1).toInt, ol(7).toDouble, 1)) )
+    val orderLineIn = sc.textFile("src/main/resources/fake-orderLine-qn_*.csv").map(_.split(";")).map(ol => (ol(1).toInt, (ol(0).toInt, ol(1).toInt, ol(7).toDouble, 1)) )
     orderLineIn.take(100).foreach(println)
 
 
