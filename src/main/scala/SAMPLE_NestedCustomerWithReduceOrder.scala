@@ -27,11 +27,12 @@ object SAMPLE_NestedCustomerWithReduceOrder {
     val sc = new SparkContext(conf)
     sc.setLocalProperty("spark.serializer", classOf[KryoSerializer].getName)
 
+
     // Elasticsearch-Hadoop setup
     val esJobConf = new JobConf(sc.hadoopConfiguration)
-    esJobConf.setOutputFormat(classOf[EsOutputFormat])
+    //esJobConf.setOutputFormat(classOf[EsOutputFormat])
     esJobConf.setOutputCommitter(classOf[FileOutputCommitter])
-    esJobConf.set(ConfigurationOptions.ES_NODES, "172.20.10.2")
+    esJobConf.set(ConfigurationOptions.ES_NODES, "127.0.0.1")
     esJobConf.set(ConfigurationOptions.ES_PORT, "9200")
     esJobConf.set(ConfigurationOptions.ES_RESOURCE, "qn/customer") // index/type
     FileOutputFormat.setOutputPath(esJobConf, new Path("-"))
@@ -94,24 +95,24 @@ object SAMPLE_NestedCustomerWithReduceOrder {
                               numberOfLine: Int)
 
     println("----customer IN----")
-    val customerIn = sc.textFile(getClass.getResource("fake-customer-qn.csv").toString).map(_.split(";")).map(
+    val customerIn = sc.textFile("/Users/alex/bee-spark/src/main/resources/fake-customer-qn.csv").map(_.split(";")).map(
         c => (c(0).toInt, CustomerIn(c(0).toInt, c(1) ))
     )
     customerIn.take(100).foreach(println)
 
     println("----contact IN----")
-    val contactIn = sc.textFile(getClass.getResource("fake-contact-qn.csv").toString).map(_.split(";")).map(
+    val contactIn = sc.textFile("/Users/alex/bee-spark/src/main/resources/fake-contact-qn.csv").map(_.split(";")).map(
         c => (c(1).toInt, ContactIn(c(0).toInt, c(1).toInt, c(2), c(3), c(4), c(5), c(6), c(7) ))
     )
     contactIn.take(100).foreach(println)
 
     println("----order IN----")
-    val orderIn = sc.textFile(getClass.getResource("fake-order-qn.csv").toString).map(_.split(";")).map(
+    val orderIn = sc.textFile("/Users/alex/bee-spark/src/main/resources/fake-order-qn.csv").map(_.split(";")).map(
         o => (o(0).toInt, OrderIn(o(0).toInt, o(1).toInt, o(2), o(3), 1, format.parse(o(4)))))
     orderIn.take(100).foreach(println)
 
     println("----orderLine IN----")
-    val orderLineIn = sc.textFile("src/main/resources/fake-orderLine-qn_*.csv").map(_.split(";")).map(ol => (ol(1).toInt, (ol(0).toInt, ol(1).toInt, ol(7).toDouble, 1)) )
+    val orderLineIn = sc.textFile("/Users/alex/bee-spark/src/main/resources/fake-orderLine-qn.csv").map(_.split(";")).map(ol => (ol(1).toInt, (ol(0).toInt, ol(1).toInt, ol(7).toDouble, 1)) )
     orderLineIn.take(100).foreach(println)
 
 

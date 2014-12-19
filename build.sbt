@@ -10,10 +10,11 @@ libraryDependencies ++= Seq(
   "org.elasticsearch" % "elasticsearch-hadoop" % "2.1.0.Beta1",
   "org.apache.hadoop" % "hadoop-client" % "2.2.0",
   "org.mongodb" % "mongo-hadoop-core" % "1.3.0",
-  "org.mongodb" % "mongo-java-driver" % "2.11.4"
+  "org.mongodb" % "mongo-java-driver" % "2.12.2"
 )
 
 resolvers ++= Seq(
   "Akka Repository" at "http://repo.akka.io/releases/",
   "Conjars Repository" at "http://conjars.org/repo/"
 )
+
